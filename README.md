@@ -6,7 +6,7 @@ This program calculate the dose inside a CT phantom for a set of beam positions 
 ## .img file format
 * **int32, int32, int32**: voxel number on X/Y/Z (nx, ny & nz)
 * **float32, float32, float32**: voxel size on X/Y/Z
-* **int16[nx*ny*nz]**: HU number of voxels, in the order of X, Y, and then Z
+* **int16[`nx*ny*nz`]**: HU number of voxels, in the order of X, Y, and then Z
 
 ## .dose/.err file format
 * **int32, int32, int32**: voxel number on X/Y/Z (nx, ny & nz)
