@@ -45,6 +45,7 @@ ScanInfo::ScanInfo() {
 		if(tmp != 0)  output_full = true;
 		else          output_full = false;
 		fscanf(input, "%s %s %lf", line, line, &output_range_mm);
+		fscanf(input, "%s %s %d", line, line, &verbose);
 	}
 	fclose(input);
 
@@ -54,6 +55,7 @@ ScanInfo::ScanInfo() {
 }
 
 ScanInfo::~ScanInfo() {
+	delete [] full_matID;
 	delete [] matID;
 	delete [] dose;
 	delete [] dose_err;
@@ -101,6 +103,8 @@ void ScanInfo::init() {
 	voxelVolum = ctdx * ctdy * ctdz * mm3;
 	ctdnx = (int)(output_range_mm / ctdx - 0.5) + 1;
 	ctdnz = (int)(output_range_mm / ctdz - 0.5) + 1;
+	voxelnx = 2 * ctdnx + 1;
+	voxelnz = 2 * ctdnz + 1;
 	
 	G4int xmin, xmax, zmin, zmax;
 	if(output_range_mm >= ctnx * ctdx * 0.5) {
@@ -148,13 +152,13 @@ void ScanInfo::init() {
 	sprintf(logstr, "Scan range is X(%d, %d, %d), Z(%d, %d, %d), Energy(%.2f, %.2f, %.2f)\n", scan_x1, scan_x2, scan_dx, scan_z1, scan_z2, scan_dz, scan_e1, scan_e2, scan_de);
 	writeLog();
 
-	if(output_full) {
-		sprintf(logstr, "Will output dose arrays matching the whole CT view.\n");
-		writeLog();
-	} else {
-		sprintf(logstr, "Will output dose array in dX = %d, dZ = %d.\n", ctdnx, ctdnz);
-		writeLog();
-	}
+	// if(output_full) {
+	// 	sprintf(logstr, "Will output dose arrays matching the whole CT view.\n");
+	// 	writeLog();
+	// } else {
+	// 	sprintf(logstr, "Will output dose array in dX = %d, dZ = %d.\n", ctdnx, ctdnz);
+	// 	writeLog();
+	// }
 }
 
 
@@ -255,20 +259,20 @@ void ScanInfo::readCT() {
 	fread(&ctdz, sizeof(float), 1, ctFile);
 
 	// Map CT number to material
-	matID = new size_t[ctnx * ctny * ctnz];
+	full_matID = new size_t[ctnx * ctny * ctnz];
 	short ct_number;
 	nonAirV = 0;
 	for(int i = 0; i < ctnx * ctny * ctnz; i++) {
 		fread(&ct_number, 2, 1, ctFile);
 		if(ct_number <= -990)
-			matID[i] = 0;
+			full_matID[i] = 0;
 		else {
 			if(ct_number >= ct_range[CT_MATERIALS-1])
-				matID[i] = CT_MATERIALS;
+				full_matID[i] = CT_MATERIALS;
 			else
 				for(int j = 0; j < CT_MATERIALS; j++)
 					if(ct_number <= ct_range[j]) {
-						matID[i] = j + 1;
+						full_matID[i] = j + 1;
 						break;
 					}
 			nonAirV++;
@@ -279,15 +283,19 @@ void ScanInfo::readCT() {
 	printf("  - (%d * %d * %d) voxels at (%.2f * %.2f * %.2f) mm\n", ctnx, ctny, ctnz, ctdx, ctdy, ctdz);
 
 	// FILE* fw;
-	// fw = fopen("matID.img", "wb");
+	// fw = fopen("full_matID.img", "wb");
 	// fwrite(&ctnx, sizeof(int), 1, fw);
 	// fwrite(&ctny, sizeof(int), 1, fw);
 	// fwrite(&ctnz, sizeof(int), 1, fw);
 	// fwrite(&ctdx, sizeof(float), 1, fw);
 	// fwrite(&ctdy, sizeof(float), 1, fw);
 	// fwrite(&ctdz, sizeof(float), 1, fw);
-	// fwrite(matID, sizeof(size_t), ctnx * ctny * ctnz, fw);
+	// fwrite(full_matID, sizeof(size_t), ctnx * ctny * ctnz, fw);
 	// fclose(fw);
+}
+
+void ScanInfo::refreshVoxelMaterial(int ix, int iz) {
+	return;
 }
 
 void ScanInfo::calDose() {
@@ -359,32 +367,32 @@ void ScanInfo::writeDose(int cx, int cz, float energy) {
 	writeHead(fw1, cx, cz, energy);
 	writeHead(fw2, cx, cz, energy);
 
-	if(output_full) {  // Output full array
+	// if(output_full) {  // Output full array
 		fwrite(dose, sizeof(G4float), ctnx * ctny * ctnz, fw1);
 		fclose(fw1);
 		fwrite(dose_err, sizeof(G4float), ctnx * ctny * ctnz, fw2);
 		fclose(fw2);
-	} 
-	else {  // Output the array part higher than output_cut only
-		G4double maxDose = 0.0;
-		for(int i = 0; i < ctnx * ctny * ctnz; i++) {
-			if(dose[i] > maxDose)	maxDose = dose[i];
-		}
-		sprintf(logstr, "Output dose range X = [%d, %d], Z = [%d, %d]\n",
-		        cx - ctdnx, cx + ctdnx, cz - ctdnz, cz + ctdnz);
-		writeLog();
-		int ctnxy = ctnx * ctny;
-		int lx = 2 * ctdnx + 1;
-		for(int iz = cz - ctdnz; iz <= cz + ctdnz; iz++) {
-			for(int iy = 0; iy < ctny; iy++) {
-				G4int idx = cx - ctdnx + iy * ctnx + iz * ctnxy;
-				fwrite(&dose[idx], sizeof(G4float), lx, fw1);
-				fwrite(&dose_err[idx], sizeof(G4float), lx, fw2);
-			}
-		}
-		fclose(fw1);
-		fclose(fw2);
-	}
+	// } 
+	// else {  // Output the array part higher than output_cut only
+	// 	G4double maxDose = 0.0;
+	// 	for(int i = 0; i < ctnx * ctny * ctnz; i++) {
+	// 		if(dose[i] > maxDose)	maxDose = dose[i];
+	// 	}
+	// 	sprintf(logstr, "Output dose range X = [%d, %d], Z = [%d, %d]\n",
+	// 	        cx - ctdnx, cx + ctdnx, cz - ctdnz, cz + ctdnz);
+	// 	writeLog();
+	// 	int ctnxy = ctnx * ctny;
+	// 	int lx = 2 * ctdnx + 1;
+	// 	for(int iz = cz - ctdnz; iz <= cz + ctdnz; iz++) {
+	// 		for(int iy = 0; iy < ctny; iy++) {
+	// 			G4int idx = cx - ctdnx + iy * ctnx + iz * ctnxy;
+	// 			fwrite(&dose[idx], sizeof(G4float), lx, fw1);
+	// 			fwrite(&dose_err[idx], sizeof(G4float), lx, fw2);
+	// 		}
+	// 	}
+	// }
+	fclose(fw1);
+	fclose(fw2);
 }
 
 bool ScanInfo::reachTarget() {
@@ -421,63 +429,64 @@ bool ScanInfo::reachTarget() {
 	       100.0*(float)nTarget/(float)nCut, target_std * 100.0);
 	writeLog();
 
+	if(verbose > 0) {
+		G4float stat_ratio[NZONE] = {0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005};
+		G4float stat_dose[NZONE];
+		G4int stat_cnt[NZONE];
+		G4int stat_x0[NZONE], stat_x1[NZONE];
+		G4int stat_z0[NZONE], stat_z1[NZONE];
+		G4float stat_sum[NZONE], stat_sum2[NZONE];
+		for(int i=0; i < NZONE; i++) {
+			stat_dose[i] = stat_ratio[i] * maxDose;
+			stat_cnt[i] = 0;
+			stat_x0[i] = ctnx;		stat_x1[i] = 0;
+			stat_z0[i] = ctnz;		stat_z1[i] = 0;
+			stat_sum[i] = 0.0;		stat_sum2[i] = 0.0;
+		}
 
-	G4float stat_ratio[NZONE] = {0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005};
-	G4float stat_dose[NZONE];
-	G4int stat_cnt[NZONE];
-	G4int stat_x0[NZONE], stat_x1[NZONE];
-	G4int stat_z0[NZONE], stat_z1[NZONE];
-	G4float stat_sum[NZONE], stat_sum2[NZONE];
-	for(int i=0; i < NZONE; i++) {
-		stat_dose[i] = stat_ratio[i] * maxDose;
-		stat_cnt[i] = 0;
-		stat_x0[i] = ctnx;		stat_x1[i] = 0;
-		stat_z0[i] = ctnz;		stat_z1[i] = 0;
-		stat_sum[i] = 0.0;		stat_sum2[i] = 0.0;
-	}
-
-	G4int idx = 0;
-	for(int iz = 0; iz < ctnz; iz++) {
-		for(int iy = 0; iy < ctny; iy++) {
-			for(int ix = 0; ix < ctnx; ix++) {
-				for(int j = 0; j < NZONE; j++) {
-					if(dose[idx] > stat_dose[j]) {
-						stat_cnt[j]++;
-						stat_sum[j] += dose_err[idx];
-						stat_sum2[j] += dose_err[idx] * dose_err[idx];
-						if(stat_x0[j] > ix)   stat_x0[j] = ix;
-						if(stat_x1[j] < ix)   stat_x1[j] = ix;
-						if(stat_z0[j] > iz)   stat_z0[j] = iz;
-						if(stat_z1[j] < iz)   stat_z1[j] = iz;
-						break;
+		G4int idx = 0;
+		for(int iz = 0; iz < ctnz; iz++) {
+			for(int iy = 0; iy < ctny; iy++) {
+				for(int ix = 0; ix < ctnx; ix++) {
+					for(int j = 0; j < NZONE; j++) {
+						if(dose[idx] > stat_dose[j]) {
+							stat_cnt[j]++;
+							stat_sum[j] += dose_err[idx];
+							stat_sum2[j] += dose_err[idx] * dose_err[idx];
+							if(stat_x0[j] > ix)   stat_x0[j] = ix;
+							if(stat_x1[j] < ix)   stat_x1[j] = ix;
+							if(stat_z0[j] > iz)   stat_z0[j] = iz;
+							if(stat_z1[j] < iz)   stat_z1[j] = iz;
+							break;
+						}
 					}
+					idx++;
 				}
-				idx++;
 			}
 		}
-	}
-	sprintf(logstr, "              Count (%%)       Error%% (Mean/Std)    Range (X & Z)\n");
-	writeLog();
-	for(int j = 0; j < NZONE; j++) {
-		G4int d0;
-		if(j == 0) d0 = 100;
-		else d0 = stat_ratio[j-1] * 100;
-		G4int d1 = stat_ratio[j] * 100;
-		if(d1 > 0) {
-			sprintf(logstr, "%3d%% - %3d%%  %7d (%5.2f%%)     %4.1f+/-%4.1f     X=%.1fmm, Z=%.1fmm\n", 
-				d0, d1, stat_cnt[j], stat_cnt[j] * 100.0 / nonZero,
-				stat_sum[j] / stat_cnt[j] * 100.0, sqrt(stat_sum2[j] / stat_cnt[j] - pow(stat_sum[j]/stat_cnt[j], 2)) * 100.0,
-				(stat_x1[j] - stat_x0[j] + 1) * ctdx, (stat_z1[j] - stat_z0[j] + 1) * ctdz);
-		} else {
-			sprintf(logstr, "%3.1f%% - %3.1f%%  %7d (%5.2f%%)     %4.1f+/-%4.1f     X=%.1fmm. Z=%.1fmm\n", 
-				stat_ratio[j-1] * 100, stat_ratio[j] * 100, stat_cnt[j], stat_cnt[j] * 100.0 / nonZero,
-				stat_sum[j] / stat_cnt[j] * 100.0, sqrt(stat_sum2[j] / stat_cnt[j] - pow(stat_sum[j]/stat_cnt[j], 2)) * 100.0,
-				(stat_x1[j] - stat_x0[j] + 1) * ctdx, (stat_z1[j] - stat_z0[j] + 1) * ctdz);
+		sprintf(logstr, "              Count (%%)       Error%% (Mean/Std)    Range (X & Z)\n");
+		writeLog();
+		for(int j = 0; j < NZONE; j++) {
+			G4int d0;
+			if(j == 0) d0 = 100;
+			else d0 = stat_ratio[j-1] * 100;
+			G4int d1 = stat_ratio[j] * 100;
+			if(d1 > 0) {
+				sprintf(logstr, "%3d%% - %3d%%  %7d (%5.2f%%)     %4.1f+/-%4.1f     X=%.1fmm, Z=%.1fmm\n", 
+					d0, d1, stat_cnt[j], stat_cnt[j] * 100.0 / nonZero,
+					stat_sum[j] / stat_cnt[j] * 100.0, sqrt(stat_sum2[j] / stat_cnt[j] - pow(stat_sum[j]/stat_cnt[j], 2)) * 100.0,
+					(stat_x1[j] - stat_x0[j] + 1) * ctdx, (stat_z1[j] - stat_z0[j] + 1) * ctdz);
+			} else {
+				sprintf(logstr, "%3.1f%% - %3.1f%%  %7d (%5.2f%%)     %4.1f+/-%4.1f     X=%.1fmm. Z=%.1fmm\n", 
+					stat_ratio[j-1] * 100, stat_ratio[j] * 100, stat_cnt[j], stat_cnt[j] * 100.0 / nonZero,
+					stat_sum[j] / stat_cnt[j] * 100.0, sqrt(stat_sum2[j] / stat_cnt[j] - pow(stat_sum[j]/stat_cnt[j], 2)) * 100.0,
+					(stat_x1[j] - stat_x0[j] + 1) * ctdx, (stat_z1[j] - stat_z0[j] + 1) * ctdz);
+			}
+			writeLog();
 		}
+		sprintf(logstr, "\n");
 		writeLog();
 	}
-	sprintf(logstr, "\n");
-	writeLog();
 
 
 	if(nbatch >= maxbatch) {

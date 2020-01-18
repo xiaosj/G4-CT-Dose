@@ -14,6 +14,7 @@ public:
 
 	G4int    ctnx, ctny, ctnz;
 	G4int    ctdnx, ctdnz;
+	G4int    voxelnx, voxelnz;
 	float    ctdx, ctdy, ctdz;
 	G4double scan_e1, scan_e2, scan_de;
 	G4int    scan_x1, scan_x2, scan_dx;
@@ -28,15 +29,17 @@ public:
 	G4int     nbatch;
 	char      particle[16];
 	G4int     maxbatch;
+	G4int     verbose;
 
 	std::vector<G4Material*> ctMat;  // materials
-	size_t* matID;  // material ID of each voxle
+	size_t* matID;  // material ID of each voxle used in simulations
 	G4VPhysicalVolume* ctPV;
 	G4Material* mat[CT_MATERIALS+1];
 
 	char filePre[MAX_FILENAME_LENGTH-10];
 	char logstr[MAX_LOG_LENGTH];
 	void writeLog();
+	void refreshVoxelMaterial(int ix, int iz);
 	void calDose();
 	void writeDose(int cx, int cz, float energy);
 	bool reachTarget();
@@ -51,6 +54,7 @@ private:
 	long maxPrimary;
 	bool output_full;
 	G4double output_range_mm;
+	size_t* full_matID;
 	void init();
 	void readMaterial();
 	void readCT();
