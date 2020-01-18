@@ -82,14 +82,14 @@ G4VPhysicalVolume* VoxelConstruction::Construct() {
 		scan->ctny * scan->ctdy * 0.5,
 		scan->ctdz * 0.5);
 	G4LogicalVolume* logRepZ = new G4LogicalVolume(solRepZ, air, "RepZL");
-	new G4PVReplica("RepZP", logRepZ, contV, kZAxis, scan->ctnz, scan->ctdz);
+	new G4PVReplica("RepZP", logRepZ, contV, kZAxis, scan->voxelnz, scan->ctdz);
 
 	G4VSolid* solRepX = new G4Box("RepXS",
 		scan->ctdx * 0.5,
 		scan->ctny * scan->ctdy * 0.5,
 		scan->ctdz * 0.5);
 	G4LogicalVolume* logRepX = new G4LogicalVolume(solRepX, air, "RepXL");
-	new G4PVReplica("RepXP", logRepX, logRepZ, kXAxis, scan->ctnx, scan->ctdx);
+	new G4PVReplica("RepXP", logRepX, logRepZ, kXAxis, scan->voxelnx, scan->ctdx);
 
 	G4VSolid* solVoxel = new G4Box("voxelS",
 		scan->ctdx * 0.5,

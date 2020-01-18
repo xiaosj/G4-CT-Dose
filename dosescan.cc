@@ -101,6 +101,8 @@ int main(int argc,char** argv)
 				G4Timer sTimer;
 				sTimer.Start();
 
+				scan->refreshVoxelMaterial(ix, iz);
+				
 				double px, py, pz;
 				px = ((G4double)ix - scan->ctnx/2. + 0.5) * scan->ctdx;
 				py = -scan->ctny * scan->ctdy * 0.5 - 10;

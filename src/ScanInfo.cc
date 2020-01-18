@@ -66,7 +66,7 @@ ScanInfo::~ScanInfo() {
 	struct tm tm = *localtime(&this_t);
 	sprintf(logstr, "\nRun finishes at %d-%02d-%02d %02d:%02d:%02d\n\n",
 	        tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
-			  tm.tm_hour, tm.tm_min, tm.tm_sec);
+			tm.tm_hour, tm.tm_min, tm.tm_sec);
 	writeLog();
 	fclose(logfile);
 }
@@ -79,23 +79,6 @@ void ScanInfo::writeLog() {
 
 
 void ScanInfo::init() {
-	dose     = new G4float[ctnx * ctny * ctnz];
-	dose_err = new G4float[ctnx * ctny * ctnz];
-	de       = new G4double[ctnx * ctny * ctnz];
-	s1       = new G4double[ctnx * ctny * ctnz];
-	s2       = new G4double[ctnx * ctny * ctnz];
-	if (dose == 0 || dose_err == 0) {
-		sprintf(logstr, "Initilization Error: Fail to create the dose matrix.\n");
-		writeLog();
-		abort();
-	}
-
-	for (int i = 0; i < ctnx*ctny*ctnz; i++) {
-		de[i] = 0.0;
-		s1[i] = 0.0;
-		s2[i] = 0.0;
-	}
-
 	maxbatch = maxPrimary / primary_batch;
 	if(maxbatch % 2 != 0)	maxbatch++;
 
@@ -105,7 +88,26 @@ void ScanInfo::init() {
 	ctdnz = (int)(output_range_mm / ctdz - 0.5) + 1;
 	voxelnx = 2 * ctdnx + 1;
 	voxelnz = 2 * ctdnz + 1;
-	
+
+	matID    = new size_t[voxelnx * ctny * voxelnz];
+	dose     = new G4float[voxelnx * ctny * voxelnz];
+	dose_err = new G4float[voxelnx * ctny * voxelnz];
+	de       = new G4double[voxelnx * ctny * voxelnz];
+	s1       = new G4double[voxelnx * ctny * voxelnz];
+	s2       = new G4double[voxelnx * ctny * voxelnz];
+
+	// if (dose == 0 || dose_err == 0) {
+	// 	sprintf(logstr, "Initilization Error: Fail to create the dose matrix.\n");
+	// 	writeLog();
+	// 	abort();
+	// }
+
+	for (int i = 0; i < voxelnx * ctny * voxelnz; i++) {
+		de[i] = 0.0;
+		s1[i] = 0.0;
+		s2[i] = 0.0;
+	}
+
 	G4int xmin, xmax, zmin, zmax;
 	if(output_range_mm >= ctnx * ctdx * 0.5) {
 		xmin = ctnx / 2 - 1;
@@ -294,9 +296,34 @@ void ScanInfo::readCT() {
 	// fclose(fw);
 }
 
+
+// Refresh voxel material for different incident locations
 void ScanInfo::refreshVoxelMaterial(int ix, int iz) {
+	int voxel_idx = 0;
+	bool out_ct = false;
+	for(int idx_z = -ctdnz; idx_z <= ctdnz; idx_z++) {
+		int iz0 = iz + idx_z;
+		if(iz0 < 0 || iz0 >= ctnz) 
+			out_ct = true;
+		for(int iy0 = 0; iy0 < ctnz; iy0++) {
+			for(int idx_x = 0; idx_x < voxelnx; idx_x++) {
+				int ix0 = ix + idx_x;
+				if(ix0 < 0 || ix0 >= ctnx)
+					out_ct = true;
+				if(out_ct) {
+					matID[voxel_idx] = 0;
+					out_ct = false;
+				} else {
+					int ct_idx = iz0 * ctnx * ctny + iy0 * ctnx + ix0;
+					matID[voxel_idx] = full_matID[ct_idx];
+				}
+				voxel_idx++;
+			}
+		}
+	}
 	return;
 }
+
 
 void ScanInfo::calDose() {
 	if(nbatch % 2 == 1) {
