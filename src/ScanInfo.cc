@@ -88,6 +88,8 @@ void ScanInfo::init() {
 	ctdnz = (int)(output_range_mm / ctdz - 0.5) + 1;
 	voxelnx = 2 * ctdnx + 1;
 	voxelnz = 2 * ctdnz + 1;
+	sprintf(logstr, "Simulation Voxels are (%d, %d, %d)\n", voxelnx, ctny, voxelnz);
+	writeLog();
 
 	matID    = new size_t[voxelnx * ctny * voxelnz];
 	dose     = new G4float[voxelnx * ctny * voxelnz];
@@ -102,11 +104,7 @@ void ScanInfo::init() {
 	// 	abort();
 	// }
 
-	for (int i = 0; i < voxelnx * ctny * voxelnz; i++) {
-		de[i] = 0.0;
-		s1[i] = 0.0;
-		s2[i] = 0.0;
-	}
+	reset();
 
 	G4int xmin, xmax, zmin, zmax;
 	if(output_range_mm >= ctnx * ctdx * 0.5) {
@@ -305,7 +303,7 @@ void ScanInfo::refreshVoxelMaterial(int ix, int iz) {
 		int iz0 = iz + idx_z;
 		if(iz0 < 0 || iz0 >= ctnz) 
 			out_ct = true;
-		for(int iy0 = 0; iy0 < ctnz; iy0++) {
+		for(int iy0 = 0; iy0 < ctny; iy0++) {
 			for(int idx_x = 0; idx_x < voxelnx; idx_x++) {
 				int ix0 = ix + idx_x;
 				if(ix0 < 0 || ix0 >= ctnx)
@@ -328,14 +326,14 @@ void ScanInfo::refreshVoxelMaterial(int ix, int iz) {
 void ScanInfo::calDose() {
 	if(nbatch % 2 == 1) {
 		// printf("Writing to s1\n");
-		for(int i = 0; i < ctnx * ctny * ctnz; i++) {
+		for(int i = 0; i < voxelnx * ctny * voxelnz; i++) {
 			s1[i] += de[i];
 			de[i] = 0.0;
 		}
 	}
 	else {
 		// printf("Writing to s2\n");
-		for(int i = 0; i < ctnx * ctny * ctnz; i++) {
+		for(int i = 0; i < voxelnx * ctny * voxelnz; i++) {
 			s2[i] += de[i];
 			de[i] = 0.0;
 		}
@@ -395,9 +393,9 @@ void ScanInfo::writeDose(int cx, int cz, float energy) {
 	writeHead(fw2, cx, cz, energy);
 
 	// if(output_full) {  // Output full array
-		fwrite(dose, sizeof(G4float), ctnx * ctny * ctnz, fw1);
+		fwrite(dose, sizeof(G4float), voxelnx * ctny * voxelnz, fw1);
 		fclose(fw1);
-		fwrite(dose_err, sizeof(G4float), ctnx * ctny * ctnz, fw2);
+		fwrite(dose_err, sizeof(G4float), voxelnx * ctny * voxelnz, fw2);
 		fclose(fw2);
 	// } 
 	// else {  // Output the array part higher than output_cut only
@@ -426,7 +424,7 @@ bool ScanInfo::reachTarget() {
 	G4double maxDose = 0.0;
 	G4double unit_factor = MeV / gram;  // output MeV/gram/primary
 	unit_factor *= voxelVolum * G4float(nbatch * primary_batch); // multiply to reduce calculations in the loop
-	for(int i = 0; i < ctnx * ctny * ctnz; i++) {
+	for(int i = 0; i < voxelnx * ctny * voxelnz; i++) {
 		dose[i] = (s1[i] + s2[i]) / (ctMat[matID[i]]->GetDensity() * unit_factor);
 		if(dose[i] > 0.0)
 			dose_err[i] = abs(s1[i] - s2[i]) / (s1[i] + s2[i]);
@@ -441,7 +439,7 @@ bool ScanInfo::reachTarget() {
 	G4int nonZero = 0;
 	G4int nCut = 0;
 	G4int nTarget = 0;
-	for(int i = 0; i < ctnx * ctny * ctnz; i++) {
+	for(int i = 0; i < voxelnx * ctny * voxelnz; i++) {
 		if(dose[i] > 0.0)		nonZero++;		
 		if(dose[i] > doseCut) {
 			nCut++;
@@ -472,9 +470,9 @@ bool ScanInfo::reachTarget() {
 		}
 
 		G4int idx = 0;
-		for(int iz = 0; iz < ctnz; iz++) {
+		for(int iz = 0; iz < voxelnz; iz++) {
 			for(int iy = 0; iy < ctny; iy++) {
-				for(int ix = 0; ix < ctnx; ix++) {
+				for(int ix = 0; ix < voxelnx; ix++) {
 					for(int j = 0; j < NZONE; j++) {
 						if(dose[idx] > stat_dose[j]) {
 							stat_cnt[j]++;
@@ -525,7 +523,7 @@ bool ScanInfo::reachTarget() {
 
 
 void ScanInfo::reset() {
-	for (int i = 0; i < ctnx*ctny*ctnz; i++) {
+	for (int i = 0; i < voxelnx * ctny * voxelnz; i++) {
 		de[i]    = 0.0;
 		s1[i]    = 0.0;
 		s2[i]    = 0.0;

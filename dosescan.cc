@@ -58,7 +58,7 @@ int main(int argc,char** argv)
 	G4UImanager* UI = G4UImanager::GetUIpointer();
 	UI->ApplyCommand("/run/verbose 0");
 	UI->ApplyCommand("/event/verbose 0");
-	UI->ApplyCommand("/tracking/verbose 0");
+	UI->ApplyCommand("/tracking/verbose 1");
 
 	// input parameters
 	if(argc > 1)  {
@@ -102,11 +102,11 @@ int main(int argc,char** argv)
 				sTimer.Start();
 
 				scan->refreshVoxelMaterial(ix, iz);
-				
-				double px, py, pz;
-				px = ((G4double)ix - scan->ctnx/2. + 0.5) * scan->ctdx;
+
+				double px = 0.0, py, pz = 0.0;
+				// px = ((G4double)ix - scan->ctnx/2. + 0.5) * scan->ctdx;
 				py = -scan->ctny * scan->ctdy * 0.5 - 10;
-				pz = ((G4double)iz - scan->ctnz/2. + 0.5) * scan->ctdz;
+				// pz = ((G4double)iz - scan->ctnz/2. + 0.5) * scan->ctdz;
 				sprintf(cmd, "/gun/position %.2f %.2f %.2f mm", px, py, pz);
 				UI->ApplyCommand(cmd);
 

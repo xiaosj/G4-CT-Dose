@@ -8,7 +8,7 @@
 #include "G4PVParameterised.hh"
 #include "VoxelNestedParam.hh"
 
-#define WORLD_SIZE 50
+#define WORLD_SIZE 80
 
 VoxelConstruction::VoxelConstruction() {}
 
@@ -38,9 +38,9 @@ G4VPhysicalVolume* VoxelConstruction::Construct() {
 	//-------------- CT Container -------------
 	G4Box* contS = new G4Box(
 		"container",
-		scan->ctnx * scan->ctdx * 0.5,
+		scan->voxelnx * scan->ctdx * 0.5,
 		scan->ctny * scan->ctdy * 0.5,
-		scan->ctnz * scan->ctdz * 0.5);
+		scan->voxelnz * scan->ctdz * 0.5);
 	G4LogicalVolume* contV = new G4LogicalVolume(contS, air, "container");
 	G4VPhysicalVolume* contPV = new G4PVPlacement(
 		0,					// no rotation
@@ -78,7 +78,7 @@ G4VPhysicalVolume* VoxelConstruction::Construct() {
 
 	//---------------- CT Voxel from nested replica -------------
 	G4VSolid* solRepZ = new G4Box("RepZS",
-		scan->ctnx * scan->ctdx * 0.5,
+		scan->voxelnx * scan->ctdx * 0.5,
 		scan->ctny * scan->ctdy * 0.5,
 		scan->ctdz * 0.5);
 	G4LogicalVolume* logRepZ = new G4LogicalVolume(solRepZ, air, "RepZL");

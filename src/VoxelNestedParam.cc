@@ -13,7 +13,7 @@ VoxelNestedParam::VoxelNestedParam() {}
 
 VoxelNestedParam::VoxelNestedParam(ScanInfo* scaninfo) {
 	scan = scaninfo;
-    ctnxy = scan->ctnx * scan->ctny;
+    ctnxy = scan->voxelnx * scan->ctny;
     trans_y = new G4double[scan->ctny];
     for(int iy = 0; iy < scan->ctny; iy++)
         trans_y[iy] = (2. * iy + 1. - scan->ctny) * scan->ctdy * 0.5;
@@ -35,9 +35,10 @@ ComputeMaterial(G4VPhysicalVolume *currentVol,
 	// Copy number of voxels
     G4int iz = parentTouch->GetReplicaNumber(1);
     G4int ix = parentTouch->GetReplicaNumber(0);
-    G4int copyNo = ix + scan->ctnx * repNo + ctnxy * iz;
-    unsigned int id = scan->matID[copyNo];
-    // printf("(%d,%d,%d) mat[%d]\n", ix, repNo, iz, id);
+    G4int copyNo = ix + scan->voxelnx * repNo + ctnxy * iz;
+    printf("matID[(%d,%d,%d)_%d] = ", ix, repNo, iz, copyNo);
+    size_t id = scan->matID[copyNo];
+    printf("mat[%d]\n", id);
     return scan->mat[id];
 }
 

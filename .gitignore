@@ -6,3 +6,11 @@
 
 # Python
 __pycache__
+
+# Simulation files
+build
+scan.ini
+*.img
+*.dose
+*.err
+*.log
