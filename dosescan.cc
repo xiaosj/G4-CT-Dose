@@ -86,36 +86,41 @@ int main(int argc,char** argv)
 	sprintf(cmd, "/gun/direction 0 1 0");
 	UI->ApplyCommand(cmd);
 
-	int esteps = (scan->scan_e2 - scan->scan_e1) / scan->scan_de + 1;
+	int esteps = scan->n_fixed_esteps + scan->n_random_esteps;
 	int zsteps = (scan->scan_z2 - scan->scan_z1) / scan->scan_dz + 1;
 	int xsteps = (scan->scan_x2 - scan->scan_x1) / scan->scan_dx + 1;
 	int nsteps = esteps * zsteps * xsteps;
 	int istep = 0;
 
-	for(double energy = scan->scan_e1; energy <= scan->scan_e2; energy += scan->scan_de) {
-		sprintf(cmd, "/gun/energy %.2f MeV", energy);
-		UI->ApplyCommand(cmd);
+	for(int iz = scan->scan_z1; iz <= scan->scan_z2; iz += scan->scan_dz) {
+		for(int ix = scan->scan_x1; ix <= scan->scan_x2; ix += scan->scan_dx) {
+			double px, py, pz;
+			px = ((G4double)ix - scan->ctnx/2. + 0.5) * scan->ctdx;
+			py = -scan->ctny * scan->ctdy * 0.5 - 10;
+			pz = ((G4double)iz - scan->ctnz/2. + 0.5) * scan->ctdz;
+			sprintf(cmd, "/gun/position %.2f %.2f %.2f mm", px, py, pz);
+			UI->ApplyCommand(cmd);
 
-		for(int iz = scan->scan_z1; iz <= scan->scan_z2; iz += scan->scan_dz) {
-			for(int ix = scan->scan_x1; ix <= scan->scan_x2; ix += scan->scan_dx) {
+			for(int ie = 0; ie < esteps; ie++) {
 				G4Timer sTimer;
 				sTimer.Start();
 
-				double px, py, pz;
-				px = ((G4double)ix - scan->ctnx/2. + 0.5) * scan->ctdx;
-				py = -scan->ctny * scan->ctdy * 0.5 - 10;
-				pz = ((G4double)iz - scan->ctnz/2. + 0.5) * scan->ctdz;
-				sprintf(cmd, "/gun/position %.2f %.2f %.2f mm", px, py, pz);
+				float energy;
+				if(ie < scan->n_fixed_esteps)
+					energy = scan->fixed_esteps[ie];
+				else
+					energy = scan->random_emin + (scan->random_emax - scan->random_emin) * G4RandFlat::shoot(); //(float)rand() / (float)RAND_MAX;
+				sprintf(cmd, "/gun/energy %.3f MeV", energy);
 				UI->ApplyCommand(cmd);
 
 				istep++;
-				sprintf(scan->logstr, "\nRun %d/%d: %.2f MeV beams at (%d,%d)->(%.2f,%.2f)\n",
+				sprintf(scan->logstr, "\nRun %d/%d: %.3f MeV beams at (%d,%d)->(%.2f,%.2f)\n",
 					     istep, nsteps, energy/MeV, ix, iz, px, pz);
 				scan->writeLog();
 
-				sprintf(scan->filePre, "%d-%d", ix, iz);
+				sprintf(scan->filePre, "%d-%d-%d", ix, iz, ie);
 				scan->nbatch = 0;
-				scan->reset();
+				scan->reset(ix, iz, energy);
 				do {
 					for(int in = 0; in < 2; in++) {
 						G4Timer bTimer;
@@ -138,7 +143,7 @@ int main(int argc,char** argv)
 						scan->writeLog();
 					}
 				}while( !(scan->reachTarget()) );
-				scan->writeDose(ix, iz, energy);
+				scan->writeDose();
 
 				sTimer.Stop();
 				sprintf(scan->logstr, "  The scan finishes in %.0f s.\n", sTimer.GetRealElapsed());

@@ -28,6 +28,12 @@ public:
 	G4int     nbatch;
 	char      particle[16];
 	G4int     maxbatch;
+	int       cx, cz;
+	double    energy;
+	int       n_fixed_esteps;
+	float     fixed_esteps[MAX_FIEXED_ESTEPS];
+	float     random_emin, random_emax;
+	int       n_random_esteps;
 
 	std::vector<G4Material*> ctMat;  // materials
 	size_t* matID;  // material ID of each voxle
@@ -38,9 +44,9 @@ public:
 	char logstr[MAX_LOG_LENGTH];
 	void writeLog();
 	void calDose();
-	void writeDose(int cx, int cz, float energy);
+	void writeDose();
 	bool reachTarget();
-	void reset();
+	void reset(int cx_in, int cz_in, float energy_in);
 
 private:
 	char  ct_filename[MAX_FILENAME_LENGTH];
@@ -50,11 +56,12 @@ private:
 	G4int nonAirV;
 	long maxPrimary;
 	bool output_full;
+	int verbose;
 	G4double output_range_mm;
 	void init();
 	void readMaterial();
 	void readCT();
-	void writeHead(FILE* fw, int cx, int cz, float energy);
+	void writeHead(FILE* fw);
 	FILE* logfile;
 };
 

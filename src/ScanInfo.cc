@@ -27,25 +27,46 @@ ScanInfo::ScanInfo() {
 	if( (input = fopen("scan.ini", "r")) == NULL) {
 		sprintf(logstr, "Cannot open scan.ini\n");
 		writeLog();
-	} else {
-		sprintf(logstr, "Reading scan.ini ......\n");
-		writeLog();
+		exit(-1);
+	} 
+	sprintf(logstr, "Reading scan.ini ......\n");
+	writeLog();
 
-		fscanf(input, "%s %s %s", line, line, ct_filename);
-		fscanf(input, "%s %s %s", line, line, mat_filename);
-		fscanf(input, "%s %s %s", line, line, particle);
-		fscanf(input, "%s %s %lf %lf %lf", line, line, &scan_e1, &scan_e2, &scan_de);
-		fscanf(input, "%s %s %d %d %d", line, line, &scan_x1, &scan_x2, &scan_dx);
-		fscanf(input, "%s %s %d %d %d", line, line, &scan_z1, &scan_z2, &scan_dz);
-		fscanf(input, "%s %s %lf %lf", line, line, &target_pct, &target_std);
-		fscanf(input, "%s %s %d", line, line, &primary_batch);
-		fscanf(input, "%s %s %ld", line, line, &maxPrimary);
-		int tmp;
-		fscanf(input, "%s %s %d", line, line, &tmp);
-		if(tmp != 0)  output_full = true;
-		else          output_full = false;
-		fscanf(input, "%s %s %lf", line, line, &output_range_mm);
+	fscanf(input, "%s %s %s", line, line, ct_filename);
+	fscanf(input, "%s %s %s", line, line, mat_filename);
+	fscanf(input, "%s %s %s", line, line, particle);
+	
+	// fscanf(input, "%[^\n]", line);
+	fgets(line, sizeof(line), input);  // read the "\n" from the previous fscanf
+	fgets(line, sizeof(line), input);
+	n_fixed_esteps = 0;
+	char* pch;
+	pch = strtok(line, " ,");
+	pch = strtok(NULL, " ,");  // skip the name
+	pch = strtok(NULL, " ,");  // skip the "="
+	while(pch != NULL) {
+		fixed_esteps[n_fixed_esteps] = atof(pch);
+		pch = strtok(NULL, " ,");
+		n_fixed_esteps++;
+		if(n_fixed_esteps == MAX_FIEXED_ESTEPS) {
+			printf("Exceed the maximum fixed energy steps (%d)\n", MAX_FIEXED_ESTEPS);
+			exit(-2);
+		}
 	}
+	fscanf(input, "%s %s %f %f %d", line, line, &random_emin, & random_emax, &n_random_esteps);
+
+	fscanf(input, "%s %s %d %d %d", line, line, &scan_x1, &scan_x2, &scan_dx);
+	fscanf(input, "%s %s %d %d %d", line, line, &scan_z1, &scan_z2, &scan_dz);
+	fscanf(input, "%s %s %lf %lf", line, line, &target_pct, &target_std);
+	fscanf(input, "%s %s %d", line, line, &primary_batch);
+	fscanf(input, "%s %s %ld", line, line, &maxPrimary);
+	int tmp;
+	fscanf(input, "%s %s %d", line, line, &tmp);
+	if(tmp != 0)  output_full = true;
+	else          output_full = false;
+	fscanf(input, "%s %s %lf", line, line, &output_range_mm);
+	fscanf(input, "%s %s %d", line, line, &verbose);
+
 	fclose(input);
 
 	readMaterial();
@@ -148,6 +169,9 @@ void ScanInfo::init() {
 	sprintf(logstr, "Scan range is X(%d, %d, %d), Z(%d, %d, %d), Energy(%.2f, %.2f, %.2f)\n", scan_x1, scan_x2, scan_dx, scan_z1, scan_z2, scan_dz, scan_e1, scan_e2, scan_de);
 	writeLog();
 
+	sprintf(logstr, "Scan in %d Fixed and %d Random energy steps.\n", n_fixed_esteps, n_random_esteps);
+	writeLog();
+
 	if(output_full) {
 		sprintf(logstr, "Will output dose arrays matching the whole CT view.\n");
 		writeLog();
@@ -155,6 +179,9 @@ void ScanInfo::init() {
 		sprintf(logstr, "Will output dose array in dX = %d, dZ = %d.\n", ctdnx, ctdnz);
 		writeLog();
 	}
+
+	sprintf(logstr, "\n\n");
+	writeLog();
 }
 
 
@@ -309,7 +336,7 @@ void ScanInfo::calDose() {
 
 
 // Write file head
-void ScanInfo::writeHead(FILE *fw, int cx, int cz, float energy) {
+void ScanInfo::writeHead(FILE *fw) {
 	fwrite(&ctnx, sizeof(G4int), 1, fw);
 	fwrite(&ctny, sizeof(G4int), 1, fw);
 	fwrite(&ctnz, sizeof(G4int), 1, fw);
@@ -338,7 +365,7 @@ void ScanInfo::writeHead(FILE *fw, int cx, int cz, float energy) {
 
 // Write data to file.
 // cx, cz: index of beam center, used when Output_full is not True
-void ScanInfo::writeDose(int cx, int cz, float energy) {
+void ScanInfo::writeDose() {
 	FILE* fw1;
 	FILE* fw2;
 	char file1[MAX_FILENAME_LENGTH];
@@ -356,8 +383,8 @@ void ScanInfo::writeDose(int cx, int cz, float energy) {
 		abort();
 	}
 
-	writeHead(fw1, cx, cz, energy);
-	writeHead(fw2, cx, cz, energy);
+	writeHead(fw1);
+	writeHead(fw2);
 
 	if(output_full) {  // Output full array
 		fwrite(dose, sizeof(G4float), ctnx * ctny * ctnz, fw1);
@@ -421,64 +448,64 @@ bool ScanInfo::reachTarget() {
 	       100.0*(float)nTarget/(float)nCut, target_std * 100.0);
 	writeLog();
 
+	if(verbose > 0) {
+		G4float stat_ratio[NZONE] = {0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005};
+		G4float stat_dose[NZONE];
+		G4int stat_cnt[NZONE];
+		G4int stat_x0[NZONE], stat_x1[NZONE];
+		G4int stat_z0[NZONE], stat_z1[NZONE];
+		G4float stat_sum[NZONE], stat_sum2[NZONE];
+		for(int i=0; i < NZONE; i++) {
+			stat_dose[i] = stat_ratio[i] * maxDose;
+			stat_cnt[i] = 0;
+			stat_x0[i] = ctnx;		stat_x1[i] = 0;
+			stat_z0[i] = ctnz;		stat_z1[i] = 0;
+			stat_sum[i] = 0.0;		stat_sum2[i] = 0.0;
+		}
 
-	G4float stat_ratio[NZONE] = {0.5, 0.2, 0.1, 0.05, 0.02, 0.01, 0.005};
-	G4float stat_dose[NZONE];
-	G4int stat_cnt[NZONE];
-	G4int stat_x0[NZONE], stat_x1[NZONE];
-	G4int stat_z0[NZONE], stat_z1[NZONE];
-	G4float stat_sum[NZONE], stat_sum2[NZONE];
-	for(int i=0; i < NZONE; i++) {
-		stat_dose[i] = stat_ratio[i] * maxDose;
-		stat_cnt[i] = 0;
-		stat_x0[i] = ctnx;		stat_x1[i] = 0;
-		stat_z0[i] = ctnz;		stat_z1[i] = 0;
-		stat_sum[i] = 0.0;		stat_sum2[i] = 0.0;
-	}
-
-	G4int idx = 0;
-	for(int iz = 0; iz < ctnz; iz++) {
-		for(int iy = 0; iy < ctny; iy++) {
-			for(int ix = 0; ix < ctnx; ix++) {
-				for(int j = 0; j < NZONE; j++) {
-					if(dose[idx] > stat_dose[j]) {
-						stat_cnt[j]++;
-						stat_sum[j] += dose_err[idx];
-						stat_sum2[j] += dose_err[idx] * dose_err[idx];
-						if(stat_x0[j] > ix)   stat_x0[j] = ix;
-						if(stat_x1[j] < ix)   stat_x1[j] = ix;
-						if(stat_z0[j] > iz)   stat_z0[j] = iz;
-						if(stat_z1[j] < iz)   stat_z1[j] = iz;
-						break;
+		G4int idx = 0;
+		for(int iz = 0; iz < ctnz; iz++) {
+			for(int iy = 0; iy < ctny; iy++) {
+				for(int ix = 0; ix < ctnx; ix++) {
+					for(int j = 0; j < NZONE; j++) {
+						if(dose[idx] > stat_dose[j]) {
+							stat_cnt[j]++;
+							stat_sum[j] += dose_err[idx];
+							stat_sum2[j] += dose_err[idx] * dose_err[idx];
+							if(stat_x0[j] > ix)   stat_x0[j] = ix;
+							if(stat_x1[j] < ix)   stat_x1[j] = ix;
+							if(stat_z0[j] > iz)   stat_z0[j] = iz;
+							if(stat_z1[j] < iz)   stat_z1[j] = iz;
+							break;
+						}
 					}
+					idx++;
 				}
-				idx++;
 			}
 		}
-	}
-	sprintf(logstr, "              Count (%%)       Error%% (Mean/Std)    Range (X & Z)\n");
-	writeLog();
-	for(int j = 0; j < NZONE; j++) {
-		G4int d0;
-		if(j == 0) d0 = 100;
-		else d0 = stat_ratio[j-1] * 100;
-		G4int d1 = stat_ratio[j] * 100;
-		if(d1 > 0) {
-			sprintf(logstr, "%3d%% - %3d%%  %7d (%5.2f%%)     %4.1f+/-%4.1f     X=%.1fmm, Z=%.1fmm\n", 
-				d0, d1, stat_cnt[j], stat_cnt[j] * 100.0 / nonZero,
-				stat_sum[j] / stat_cnt[j] * 100.0, sqrt(stat_sum2[j] / stat_cnt[j] - pow(stat_sum[j]/stat_cnt[j], 2)) * 100.0,
-				(stat_x1[j] - stat_x0[j] + 1) * ctdx, (stat_z1[j] - stat_z0[j] + 1) * ctdz);
-		} else {
-			sprintf(logstr, "%3.1f%% - %3.1f%%  %7d (%5.2f%%)     %4.1f+/-%4.1f     X=%.1fmm. Z=%.1fmm\n", 
-				stat_ratio[j-1] * 100, stat_ratio[j] * 100, stat_cnt[j], stat_cnt[j] * 100.0 / nonZero,
-				stat_sum[j] / stat_cnt[j] * 100.0, sqrt(stat_sum2[j] / stat_cnt[j] - pow(stat_sum[j]/stat_cnt[j], 2)) * 100.0,
-				(stat_x1[j] - stat_x0[j] + 1) * ctdx, (stat_z1[j] - stat_z0[j] + 1) * ctdz);
+		sprintf(logstr, "              Count (%%)       Error%% (Mean/Std)    Range (X & Z)\n");
+		writeLog();
+		for(int j = 0; j < NZONE; j++) {
+			G4int d0;
+			if(j == 0) d0 = 100;
+			else d0 = stat_ratio[j-1] * 100;
+			G4int d1 = stat_ratio[j] * 100;
+			if(d1 > 0) {
+				sprintf(logstr, "%3d%% - %3d%%  %7d (%5.2f%%)     %4.1f+/-%4.1f     X=%.1fmm, Z=%.1fmm\n", 
+					d0, d1, stat_cnt[j], stat_cnt[j] * 100.0 / nonZero,
+					stat_sum[j] / stat_cnt[j] * 100.0, sqrt(stat_sum2[j] / stat_cnt[j] - pow(stat_sum[j]/stat_cnt[j], 2)) * 100.0,
+					(stat_x1[j] - stat_x0[j] + 1) * ctdx, (stat_z1[j] - stat_z0[j] + 1) * ctdz);
+			} else {
+				sprintf(logstr, "%3.1f%% - %3.1f%%  %7d (%5.2f%%)     %4.1f+/-%4.1f     X=%.1fmm. Z=%.1fmm\n", 
+					stat_ratio[j-1] * 100, stat_ratio[j] * 100, stat_cnt[j], stat_cnt[j] * 100.0 / nonZero,
+					stat_sum[j] / stat_cnt[j] * 100.0, sqrt(stat_sum2[j] / stat_cnt[j] - pow(stat_sum[j]/stat_cnt[j], 2)) * 100.0,
+					(stat_x1[j] - stat_x0[j] + 1) * ctdx, (stat_z1[j] - stat_z0[j] + 1) * ctdz);
+			}
+			writeLog();
 		}
+		sprintf(logstr, "\n");
 		writeLog();
 	}
-	sprintf(logstr, "\n");
-	writeLog();
-
 
 	if(nbatch >= maxbatch) {
 		printf("Stop simulation. Max primary particle number reached.\n");
@@ -488,10 +515,13 @@ bool ScanInfo::reachTarget() {
 }
 
 
-void ScanInfo::reset() {
+void ScanInfo::reset(int cx_in, int cz_in, float energy_in) {
 	for (int i = 0; i < ctnx*ctny*ctnz; i++) {
 		de[i]    = 0.0;
 		s1[i]    = 0.0;
 		s2[i]    = 0.0;
-	}	
+	}
+	cx = cx_in;
+	cz = cz_in;
+	energy = energy_in;
 }
