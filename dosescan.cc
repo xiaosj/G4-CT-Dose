@@ -162,5 +162,9 @@ int main(int argc,char** argv)
 			  tm.tm_hour, tm.tm_min, tm.tm_sec);
 	scan->writeLog();
 	
+	FILE* f = fopen("run.stop", "w");
+	fputs("\n", f);
+	fclose(f);
+
 	delete runManager;
 }
