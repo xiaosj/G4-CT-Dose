@@ -160,7 +160,7 @@ if __name__ == "__main__":
             # busb command to submit a job
             hh = tpj // 3600
             mm = (tpj % 3600) // 60
-            submit = subprocess.check_output('bsub -G rpgrp -R "select[hname!=\'kiso*\']" -W {:d}:{:d} {:s}/dosescan'.format(hh, mm, cwd), shell=True)
+            submit = subprocess.check_output('bsub -G rpgrp -R "select[!kiso]" -W {:d}:{:d} {:s}/dosescan'.format(hh, mm, cwd), shell=True)
             flog.write('{:s}: {:s}'.format(timestr, submit.decode()))
             
             os.chdir('..')
