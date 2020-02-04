@@ -1,2 +1,4 @@
-max_jobs = 2
-max_wall_time = 00:01
+max_jobs = 20
+max_wall_time = 00:10
+second_per_million = 100
+time_per_job = 24:00
