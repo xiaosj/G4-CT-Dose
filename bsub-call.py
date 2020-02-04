@@ -66,6 +66,12 @@ def unfinish_jobs():
     return unfinish
 
 
+def check_jobs():
+    ''' Check if jobs run successfully and Re-submit failed jobs.
+    '''
+    pass
+
+
 if __name__ == "__main__":
     try:
         flog = open('bsub-run.log', 'w')
@@ -152,8 +158,10 @@ if __name__ == "__main__":
             os.chdir(run_name)
 
             # busb command to submit a job
-            # submit = subprocess.check_output('bsub -G rpgrp -W 12:00 {:s}/dosescan'.format(cwd), shell=True)
-            # flog.write('{:s}: {:s}'.format(timestr, submit.decode()))
+            hh = tpj // 3600
+            mm = (tpj % 3600) // 60
+            submit = subprocess.check_output('bsub -G rpgrp -R "select[hname!=\'kiso*\']" -W {:d}:{:d} {:s}/dosescan'.format(hh, mm, cwd), shell=True)
+            flog.write('{:s}: {:s}'.format(timestr, submit.decode()))
             
             os.chdir('..')
 
