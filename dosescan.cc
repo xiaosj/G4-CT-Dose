@@ -8,7 +8,7 @@
 #include "G4UIterminal.hh"
 #include "G4Timer.hh"
 #include "G4VModularPhysicsList.hh"
-#include "Shielding.hh"
+#include "G4PhysListFactory.hh"
 
 #include "ScanGlobals.hh"
 #include "ScanInfo.hh"
@@ -42,10 +42,12 @@ int main(int argc,char** argv)
 	VoxelConstruction* ctVoxel = new VoxelConstruction(scan);
 	runManager->SetUserInitialization(ctVoxel);
 
-	// G4VModularPhysicsList* phyList = new Shielding;
-	// phyList->SetVerboseLevel(0);
-	// runManager->SetUserInitialization(phyList);
-	runManager->SetUserInitialization(new PhyList);
+	G4PhysListFactory *phyListFactory = new G4PhysListFactory();
+	G4VModularPhysicsList *physicsList = phyListFactory->GetReferencePhysList("QGSP_BIC_EMY");
+	physicsList->SetDefaultCutValue(0.5*mm);
+	physicsList->SetVerboseLevel(1);
+	runManager->SetUserInitialization(physicsList);
+	// runManager->SetUserInitialization(new PhyList);
 
 	runManager->SetUserAction(new PrimaryGen);
 
