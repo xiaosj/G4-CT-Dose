@@ -13,6 +13,7 @@ __pycache__
 build
 *.dose
 *.err
+*.txt
 run_*
 scan.ini
 run.stop
