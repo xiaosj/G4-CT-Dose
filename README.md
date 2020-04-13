@@ -24,7 +24,7 @@ Verbose = [0/1/2, verbose level]
 * **float32, float32, float32**: voxel size on X/Y/Z
 * **int16[`nx*ny*nz`]**: HU number of voxels, in the order of X, Y, and then Z
 
-The `class img_data` in `check-img.py` demonstrates how to read the `.img` file
+`class img_data` in `check-img.py` demonstrates how to read the `.img` file.
 
 ## .dose/.err file format
 * **int32, int32, int32**: voxel number on X/Y/Z (nx, ny & nz)
@@ -35,10 +35,10 @@ The `class img_data` in `check-img.py` demonstrates how to read the `.img` file
 * **int32, int32**: Zmin, Zmax of the voxel index
 * **float32[`(Xmax-Xmin+1)*ny*(Zmax-Zmin+1)`]**: Dose/Error in voxels, in the order of X, Y, and then Z
 
-The `class dose_data` in `check-img.py` demonstrates how to read the `.dose` file
+`class dose_data` in `check-img.py` demonstrates how to read the `.dose` file.
 
-## HU2mat.py
-The coversion of CT number (HU) to densities and elemental weights is based on the paper of [Schneider _et al._, _Phys. Med. Biol._ 45 (2000) 459-478](https://doi.org/10.1088/0031-9155/45/2/314).  
+## Material Definitions
+`HU2mat.py` defines the coversion of CT number (HU) to the densities and elemental weights of materials, based on the paper of [Schneider _et al._, _Phys. Med. Biol._ 45 (2000) 459-478](https://doi.org/10.1088/0031-9155/45/2/314).  
 ### Densities
 The densities are linearly interpolated between materials as described in the paper:
 
@@ -49,6 +49,8 @@ HU Range | Density Interpolation
 14 - 23 | Constant as 1.03 g/cm<sup>3</sup>
 23 - 100 | Between Small Intenstine and Connective Tissue (Eq. 23)
 \>100 | Between Yellow/Red Marrow and Cortical Bone (Eq. 19)
+
+_Note: To minimize the fluctration of CT scans on air, the HUs in the range from -1000 to the first HU in the material definition file use the density of air (i.e. no interpolation)._
 
 ### Elemental Weights
 However, to have resolutions finer than the 24-bin setting in the paper, some deviations are introduced:
