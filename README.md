@@ -17,7 +17,7 @@ This program calculate the dose inside a CT phantom for a set of beam positions 
 * **int32, int32**: Zmin, Zmax of the voxel index
 * **float32[`(Xmax-Xmin+1)*ny*(Zmax-Zmin+1)`]**: Dose/Error in voxels, in the order of X, Y, and then Z
 
-## HUmat.py
+## HU2mat.py
 The coversion of CT number (HU) to densities and elemental weights is based on the paper of [Schneider _et al._, _Phys. Med. Biol._ 45 (2000) 459-478](https://doi.org/10.1088/0031-9155/45/2/314).  
 ### Densities
 The densities are linearly interpolated between materials as described in the paper:
@@ -46,4 +46,4 @@ HU Range | In Paper | In Code
 * The code interpolate the elemental weights according to Eq. 18.
 * The code uses the mean of the interpolated values of all HUs in a bin.
 
-An ouput with 97 bins is given.
+An ouput with 99 bins is given.
