@@ -63,6 +63,7 @@ private:
 	void readCT();
 	void writeHead(FILE* fw);
 	FILE* logfile;
+	unsigned int* HU2matID;
 };
 
 #endif

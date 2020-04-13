@@ -81,6 +81,7 @@ ScanInfo::~ScanInfo() {
 	delete [] s1;
 	delete [] s2;
 	delete [] de;
+	delete [] HU2matID;
 	time_t this_t = time(NULL);
 	struct tm tm = *localtime(&this_t);
 	sprintf(logstr, "\nRun finishes at %d-%02d-%02d %02d:%02d:%02d\n\n",
@@ -187,7 +188,7 @@ void ScanInfo::init() {
 
 void ScanInfo::readMaterial() {
 	FILE* matFile;
-	G4int total_mat;
+	G4int total_mat, nElements;
 	G4double rho[CT_MATERIALS];
 	G4double elements[CT_MATERIALS][CT_ELEMENTS];
 
@@ -197,7 +198,7 @@ void ScanInfo::readMaterial() {
 	}
 	G4cout << "Reading " << mat_filename << " ......" << G4endl;
 	
-	fscanf(matFile, "%d", & total_mat);
+	fscanf(matFile, "%d  %d", &total_mat, &nElements);
 	if(total_mat != CT_MATERIALS) {
 		G4cout << "Error: Must use the definition of " << CT_MATERIALS << " mateirals." << G4endl;
 		abort();
@@ -246,6 +247,56 @@ void ScanInfo::readMaterial() {
 	for(int i = 0; i<= CT_MATERIALS; i++)
 		ctMat.push_back(mat[i]);
 
+	// Map HU to material index
+	int HU_max = ct_range[CT_MATERIALS-1];
+	HU2matID = new unsigned int[HU_max + 1000 + 1];
+	for(int hu = -1000; hu <= HU_max; hu++) {
+		if(hu <= ct_range[0])
+			HU2matID[hu+1000] = 0;
+		else
+			for(int j = 1; j < CT_MATERIALS; j++)
+				if(hu <= ct_range[j]) {
+					HU2matID[hu+1000] = j+1;
+					break;
+				}
+	}
+
+	FILE* HU2mat_f = fopen("HU2mat.txt", "w");
+	char tmp[200];
+	fputs("# Materials for different HU values. The first row is for HU=-1000 and HU increases 1 per row.\n", HU2mat_f);
+	fputs("#  HU Density(g/cm3)   H     C     N     O      Na     Mg     P      S      Cl     Ar      K     Ca\n", HU2mat_f);
+	for(int hu = -1000; hu <= HU_max; hu++) {
+		int id;
+		if(hu <= -1000)
+			id = 0;
+		else if (hu >= ct_range[CT_MATERIALS-1])
+			id = CT_MATERIALS;
+		else 
+			id = HU2matID[hu+1000];
+
+		G4double density = mat[id]->GetDensity() / (gram / cm3);
+		sprintf(tmp, "%5d  %10.5f ", hu, density);
+		fputs(tmp, HU2mat_f);
+
+		// Reduce id by 1 since mat[0] is air
+		// mat[1] has the same elemental fraction of air
+		if(id > 0)  id--;
+		for(int j = 0; j < CT_ELEMENTS; j++) {
+			sprintf(tmp, " %6.3f", elements[id][j]);
+			fputs(tmp, HU2mat_f);
+		}
+		fputs("\n", HU2mat_f);
+
+		// TODO output elemental fractions directly from G4Material
+		// size_t nelement = mat[id]->GetNumberOfElements();
+		// const G4double* fraction_vec = mat[id]->GetFractionVector();
+		// for(size_t i = 0; i < nelement; i++) {
+		// 	sprintf(tmp, " %6.3f", fraction_vec[i]*100);
+		// 	fputs(tmp, HU2mat_f);
+		// }
+	}
+	fclose(HU2mat_f);
+
 	// Print all the materials defined
 	// G4cout << G4endl << "The materials defined are : " << G4endl << G4endl;
 	// G4cout << *(G4Material::GetMaterialTable()) << G4endl;
@@ -283,23 +334,17 @@ void ScanInfo::readCT() {
 
 	// Map CT number to material
 	matID = new size_t[ctnx * ctny * ctnz];
-	short ct_number;
+	short hu;
 	nonAirV = 0;
 	for(int i = 0; i < ctnx * ctny * ctnz; i++) {
-		fread(&ct_number, 2, 1, ctFile);
-		if(ct_number <= -990)
+		fread(&hu, 2, 1, ctFile);
+		if(hu <= -1000)
 			matID[i] = 0;
-		else {
-			if(ct_number >= ct_range[CT_MATERIALS-1])
-				matID[i] = CT_MATERIALS;
-			else
-				for(int j = 0; j < CT_MATERIALS; j++)
-					if(ct_number <= ct_range[j]) {
-						matID[i] = j + 1;
-						break;
-					}
-			nonAirV++;
-		}
+		else if (hu >= ct_range[CT_MATERIALS-1])
+			matID[i] = CT_MATERIALS;
+		else 
+			matID[i] = HU2matID[hu+1000];
+		if(matID[i] > 0)	nonAirV++;
 	}
 	G4cout << "  " << nonAirV << " non-Air voxels." << G4endl;
 	fclose(ctFile);
@@ -345,7 +390,8 @@ void ScanInfo::writeHead(FILE *fw) {
 	fwrite(&ctdz, sizeof(float), 1, fw);
 	fwrite(&cx, sizeof(G4int), 1, fw);
 	fwrite(&cz, sizeof(G4int), 1, fw);
-	fwrite(&energy, sizeof(float), 1, fw);
+	float energy_MeV = energy * MeV;
+	fwrite(&energy_MeV, sizeof(float), 1, fw);
 
 	// Range of dose voxels
 	G4int x0, x1, z0, z1;
