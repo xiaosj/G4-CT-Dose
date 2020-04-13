@@ -5,6 +5,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 nelement = 12
+elements = [                'H', 'C',  'N', 'O',  'Na', 'Mg', 'P',  'S',  'Cl', 'Ar',  'K', 'Ca']
 mat = {#                  [  H    C     N    O     Na    Mg    P     S     Cl    Ar     K    Ca]
     'air': {
         'HU':  -950,      # Considered fluctuations
@@ -106,7 +107,11 @@ def elwt_interpolate(mat1, mat2, HU):
 
 HU_bin = np.concatenate((np.array([-1000, -950, -120, -83, -53, -23, 7, 18, 80, 120]), np.arange(200, 1700, 100)))
 
+# Setting for Table 6 in the paper
+# HU_bin = np.concatenate((HU_bin, np.arange(200, 1600, 14)))
+
 # Setting 1
+HU_bin = np.concatenate((HU_bin, [-990, -970]))
 HU_bin = np.concatenate((HU_bin, np.linspace(-950, -741, 5, dtype=np.int)[1:]))
 HU_bin = np.concatenate((HU_bin, np.linspace(-741, -120, 13, dtype=np.int)[1:-1]))
 HU_bin = np.concatenate((HU_bin, np.array([-101, -73, -63, -43, -33, -13, -3, 100, 140, 160, 180])))
@@ -141,10 +146,10 @@ for i in range(nbin):
 
 # Write material file
 with open('mat_{:d}.txt'.format(nbin), 'w') as f:
-    f.write('{:d}\n'.format(nbin))
+    f.write('{:d}  {:d}\n'.format(nbin, nelement))
     for i in range(nbin):
-        f.write('  {:>5d}  {:<7.4f} '.format(bin_high[i], rho_HU[i]))
-        f.write(('{:>6.2f}' * nelement).format(*elwt_bin[i]))
+        f.write('  {:>5d}  {:<7.5f} '.format(bin_high[i], rho_HU[i]))
+        f.write(('{:>7.3f}' * nelement).format(*elwt_bin[i]))
         f.write('\n')
     f.write('#   HU     rho      H     C     N     O     Na    Mg    P     S     Cl    Ar    K     Ca\n')
     f.write('#                   1     2     3     4     5     6     7     8     9     10    11    12\n\n')
