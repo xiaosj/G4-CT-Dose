@@ -84,6 +84,7 @@ int main(int argc,char** argv)
 
 	char cmd[64];
 	sprintf(cmd, "/gun/particle %s", scan->particle);
+	printf(cmd, "\n");
 	UI->ApplyCommand(cmd);
 	sprintf(cmd, "/gun/direction 0 1 0");
 	UI->ApplyCommand(cmd);

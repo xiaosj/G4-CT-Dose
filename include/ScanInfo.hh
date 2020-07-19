@@ -51,6 +51,7 @@ public:
 private:
 	char  ct_filename[MAX_FILENAME_LENGTH];
 	char mat_filename[MAX_FILENAME_LENGTH];
+	G4double get_unit_factor();
 	G4int ct_range[CT_MATERIALS];
 	G4double voxelVolum;
 	G4int nonAirV;

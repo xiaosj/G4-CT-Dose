@@ -120,7 +120,7 @@ void ScanInfo::init() {
 	if(maxbatch % 2 != 0)	maxbatch++;
 
 	ctdx *= mm;		ctdy *= mm;		ctdz *= mm;
-	voxelVolum = ctdx * ctdy * ctdz * mm3;
+	voxelVolum = ctdx * ctdy * ctdz;
 	ctdnx = (int)(output_range_mm / ctdx - 0.5) + 1;
 	ctdnz = (int)(output_range_mm / ctdz - 0.5) + 1;
 	
@@ -409,6 +409,11 @@ void ScanInfo::writeHead(FILE *fw) {
 }
 
 
+G4double ScanInfo::get_unit_factor() {
+	// nGy/primary
+	return 1.0 / (gray * 1e-9 * voxelVolum * G4float(nbatch * primary_batch));
+}
+
 // Write data to file.
 // cx, cz: index of beam center, used when Output_full is not True
 void ScanInfo::writeDose() {
@@ -431,6 +436,11 @@ void ScanInfo::writeDose() {
 
 	writeHead(fw1);
 	writeHead(fw2);
+
+	G4double unit_factor = get_unit_factor();
+	for(int i = 0; i < ctnx * ctny * ctnz; i++) {
+			dose[i] *= unit_factor;
+	}
 
 	if(output_full) {  // Output full array
 		fwrite(dose, sizeof(G4float), ctnx * ctny * ctnz, fw1);
@@ -462,10 +472,9 @@ void ScanInfo::writeDose() {
 
 bool ScanInfo::reachTarget() {
 	G4double maxDose = 0.0;
-	G4double unit_factor = MeV / gram;  // output MeV/gram/primary
-	unit_factor *= voxelVolum * G4float(nbatch * primary_batch); // multiply to reduce calculations in the loop
+	G4double unit_factor = get_unit_factor();
 	for(int i = 0; i < ctnx * ctny * ctnz; i++) {
-		dose[i] = (s1[i] + s2[i]) / (ctMat[matID[i]]->GetDensity() * unit_factor);
+		dose[i] = (s1[i] + s2[i]) / ctMat[matID[i]]->GetDensity();
 		if(dose[i] > 0.0)
 			dose_err[i] = abs(s1[i] - s2[i]) / (s1[i] + s2[i]);
 		else
@@ -474,7 +483,7 @@ bool ScanInfo::reachTarget() {
 	}
 
 	G4float doseCut = maxDose * target_pct;
-	printf("    max dose = %.2e, cut = %.2e MeV/gram/primary\n", maxDose, doseCut);
+	printf("    max dose = %.2e, cut = %.2e nGy/primary\n", maxDose*unit_factor, doseCut*unit_factor);
 	
 	G4int nonZero = 0;
 	G4int nCut = 0;

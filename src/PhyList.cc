@@ -13,7 +13,7 @@
 #include "G4eplusAnnihilation.hh"
 
 PhyList::PhyList() {
-	defaultCutValue = 0.5*mm;
+	defaultCutValue = 0.2*mm;
 }
 
 PhyList::~PhyList() {}
